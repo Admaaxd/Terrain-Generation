@@ -1,0 +1,7 @@
+﻿  Building Custom Rule C:/Users/user/OneDrive/Asztali gép/glfw-3.3.9/examples/CMakeLists.txt
+  particles.c
+  tinycthread.c
+  getopt.c
+  glad_gl.c
+  Generating Code...
+  particles.vcxproj -> C:\Users\user\OneDrive\Asztali gép\glfw-3.3.9\build\examples\Debug\particles.exe

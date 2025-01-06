@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\user\OneDrive\Asztali gép\glfw-3.3.9\build\CMakeFiles\093d896f96de28dd94daa68ce4f9fb8e\update_mappings.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="C:\Users\user\OneDrive\Asztali gép\glfw-3.3.9\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\user\OneDrive\Asztali gép\glfw-3.3.9\src\mappings.h.in">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="C:\Users\user\OneDrive\Asztali gép\glfw-3.3.9\CMake\GenerateMappings.cmake" />
+    <None Include="C:\Users\user\OneDrive\Asztali gép\glfw-3.3.9\build\src\CMakeFiles\update_mappings" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{731758AD-3F92-32CC-806D-E2E7C941DEC0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{BC6AA2B1-24AA-3EB6-88D2-17D2A2609E71}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

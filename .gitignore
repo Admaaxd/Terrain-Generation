@@ -1,0 +1,9 @@
+.build/
+.vs/
+x64/
+Terrain-.dd59c2c5/
+Terrain-Generation/x64/
+Terrain-Generation.sln
+Terrain-Generation.vcxproj
+Terrain-Generation.vcxproj.filters
+Terrain-Generation.vcxproj.user
