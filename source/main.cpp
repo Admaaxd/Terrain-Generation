@@ -22,7 +22,16 @@ bool isGUIEnabled = false;
 GLdouble lastTime = glfwGetTime();
 uint8_t nbFrames = 0;
 GLfloat fps = 0;
+
+std::unordered_map<long long, Chunk> g_Chunks;
+
+const int8_t CHUNK_SIZE = 100;
+const float CELL_SIZE = 1.0f;
 #pragma endregion
+
+inline long long chunkKey(int cx, int cz) {
+	return (static_cast<long long>(cx) << 32) ^ (cz & 0xffffffff);
+}
 
 int main()
 {
@@ -33,62 +42,6 @@ int main()
 	glfwSetFramebufferSizeCallback(window, main::framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, main::mouse_callback);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-	int mainGridExtent = 100;
-	float cellSize = 1.0f;
-
-	std::vector<GLfloat> vertices;
-	std::vector<GLuint> indices;
-
-	// Number of vertices along one dimension
-	int verticesPerSide = (2 * mainGridExtent) + 1;
-
-	for (int z = -mainGridExtent; z <= mainGridExtent; ++z) {
-		for (int x = -mainGridExtent; x <= mainGridExtent; ++x) {
-			vertices.push_back(x * cellSize); // X position
-			vertices.push_back(0.0f);         // Y position
-			vertices.push_back(z * cellSize); // Z position
-		}
-	}
-
-	for (int z = 0; z < 2 * mainGridExtent; ++z) {
-		for (int x = 0; x < 2 * mainGridExtent; ++x) {
-			int topLeft = z * verticesPerSide + x;
-			int topRight = topLeft + 1;
-			int bottomLeft = (z + 1) * verticesPerSide + x;
-			int bottomRight = bottomLeft + 1;
-
-			// Triangle 1
-			indices.push_back(topLeft);
-			indices.push_back(bottomLeft);
-			indices.push_back(topRight);
-
-			// Triangle 2
-			indices.push_back(topRight);
-			indices.push_back(bottomLeft);
-			indices.push_back(bottomRight);
-		}
-	}
-
-	GLuint VAO, VBO, EBO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
-
-	glBindVertexArray(VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
 
 	shader mainShader("main.vs", "main.fs");
 
@@ -101,9 +54,9 @@ int main()
 
 		main::processInput(window);
 
-		main::processRendering(window, mainShader, VAO, indices.size());
+		main::processRendering(window, mainShader);
 
-		main::renderImGui(window);
+		main::renderImGui(window, camera.getPosition());
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -112,12 +65,13 @@ int main()
 	main::cleanup(mainShader);
 	main::cleanupImGui();
 
+	main::cleanupAllChunks();
 	glfwTerminate();
 	return 0;
 
 }
 
-void main::processRendering(GLFWwindow* window, shader& mainShader, GLuint VAO, GLsizei indexCount)
+void main::processRendering(GLFWwindow* window, shader& mainShader)
 {
 	glm::mat4 view = camera.getViewMatrix();
 	glm::mat4 projection = glm::perspective(glm::radians(75.0f), (GLfloat)(SCR_WIDTH / (GLfloat)SCR_HEIGHT), 0.1f, 1000.0f);
@@ -131,11 +85,136 @@ void main::processRendering(GLFWwindow* window, shader& mainShader, GLuint VAO, 
 	mainShader.setMat4("gVP", gVP);
 
 	glm::vec3 cameraWorldPos = camera.getPosition();
-	mainShader.setVec3("gCameraWorldPos", cameraWorldPos);
 
-	glBindVertexArray(VAO);
-	glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+	const float CELL_SIZE = 1.0f;
+	int8_t camChunkX = (int8_t)floor(cameraWorldPos.x / (CHUNK_SIZE * CELL_SIZE));
+	int8_t camChunkZ = (int8_t)floor(cameraWorldPos.z / (CHUNK_SIZE * CELL_SIZE));
+
+	int8_t R = 2;
+	for (int8_t cz = camChunkZ - R; cz <= camChunkZ + R; cz++) {
+		for (int8_t cx = camChunkX - R; cx <= camChunkX + R; cx++) {
+			long long key = chunkKey(cx, cz);
+
+			if (g_Chunks.find(key) == g_Chunks.end()) {
+				Chunk newChunk = generateChunk(cx, cz);
+				g_Chunks[key] = newChunk;
+			}
+		}
+	}
+
+	for (int8_t cz = camChunkZ - R; cz <= camChunkZ + R; cz++) {
+		for (int8_t cx = camChunkX - R; cx <= camChunkX + R; cx++) {
+			long long key = chunkKey(cx, cz);
+			auto it = g_Chunks.find(key);
+			if (it != g_Chunks.end()) {
+				Chunk& chunk = it->second;
+
+				glBindVertexArray(chunk.VAO);
+				glDrawElements(GL_TRIANGLES, chunk.indexCount, GL_UNSIGNED_INT, 0);
+				glBindVertexArray(0);
+			}
+		}
+	}
+	main::unloadFarChunks(camera.getPosition(), camChunkX, camChunkZ, 2);
+}
+
+Chunk main::generateChunk(int cx, int cz) {
+	Chunk chunk;
+	chunk.cx = cx;
+	chunk.cz = cz;
+
+	static FastNoiseLite noise;
+	noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+	noise.SetFrequency(0.023f);
+
+	const float HEIGHT_SCALE = 10.0f;
+
+	float originX = cx * CHUNK_SIZE * CELL_SIZE;
+	float originZ = cz * CHUNK_SIZE * CELL_SIZE;
+
+	std::vector<GLfloat> vertices;
+	std::vector<GLuint>  indices;
+
+	for (int8_t z = 0; z <= CHUNK_SIZE; ++z) {
+		for (int8_t x = 0; x <= CHUNK_SIZE; ++x) {
+			float wx = originX + x * CELL_SIZE;
+			float wz = originZ + z * CELL_SIZE;
+
+			float n = noise.GetNoise(wx, wz);
+			float hy = n * HEIGHT_SCALE;
+
+			vertices.push_back(wx);  // X
+			vertices.push_back(hy);  // Y
+			vertices.push_back(wz);  // Z
+		}
+	}
+
+	int8_t vertsPerSide = CHUNK_SIZE + 1;
+	for (int8_t z = 0; z < CHUNK_SIZE; ++z) {
+		for (int8_t x = 0; x < CHUNK_SIZE; ++x) {
+			int topLeft = z * vertsPerSide + x;
+			int topRight = topLeft + 1;
+			int bottomLeft = (z + 1) * vertsPerSide + x;
+			int bottomRight = bottomLeft + 1;
+
+			indices.push_back(topLeft);
+			indices.push_back(bottomLeft);
+			indices.push_back(topRight);
+
+			indices.push_back(topRight);
+			indices.push_back(bottomLeft);
+			indices.push_back(bottomRight);
+		}
+	}
+	chunk.indexCount = (GLsizei)indices.size();
+
+	glGenVertexArrays(1, &chunk.VAO);
+	glGenBuffers(1, &chunk.VBO);
+	glGenBuffers(1, &chunk.EBO);
+
+	glBindVertexArray(chunk.VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, chunk.VBO);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, chunk.EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
+
+	return chunk;
+}
+
+void main::deleteChunk(Chunk& chunk) {
+	glDeleteVertexArrays(1, &chunk.VAO);
+	glDeleteBuffers(1, &chunk.VBO);
+	glDeleteBuffers(1, &chunk.EBO);
+}
+
+void main::unloadFarChunks(const glm::vec3& cameraPosition, int8_t camChunkX, int8_t camChunkZ, int8_t renderDistance) {
+	for (auto it = g_Chunks.begin(); it != g_Chunks.end(); ) {
+		int chunkX = it->second.cx;
+		int chunkZ = it->second.cz;
+
+		if (abs(chunkX - camChunkX) > renderDistance || abs(chunkZ - camChunkZ) > renderDistance) {
+			main::deleteChunk(it->second);
+			it = g_Chunks.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
+}
+
+void main::cleanupAllChunks() {
+	for (auto& entry : g_Chunks) {
+		deleteChunk(entry.second);
+	}
+	g_Chunks.clear();
 }
 
 void main::initializeGLFW(GLFWwindow*& window)
@@ -258,7 +337,7 @@ void main::initializeImGui(GLFWwindow* window)
 	ImGui::StyleColorsDark();
 }
 
-void main::renderImGui(GLFWwindow* window)
+void main::renderImGui(GLFWwindow* window, const glm::vec3& playerPosition)
 {
 	if (!isGUIEnabled) return;
 
@@ -268,6 +347,10 @@ void main::renderImGui(GLFWwindow* window)
 	ImGui::NewFrame();
 
 	ImGui::Begin("Menu");
+
+	ImGui::Text("FPS: %.1f", fps); // FPS counter
+
+	ImGui::Text("Player Position: (%.2f, %.2f, %.2f)", playerPosition.x, playerPosition.y, playerPosition.z);
 
 	if (ImGui::Button("Exit Game")) glfwSetWindowShouldClose(window, true);
 

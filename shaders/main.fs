@@ -44,18 +44,14 @@ void main()
 
     vec4 Color;
 
-    if (Lod2a > 0.0){
-        Color = gGridColorThick;
-        Color.a *= Lod2a;
+    if (Lod2a > 0.0) {
+        Color = gGridColorThick * Lod2a;
+    } else if (Lod1a > 0.0) {
+        Color = mix(gGridColorThick, gGridColorThin, LOD_fade) * Lod1a;
     } else {
-            if (Lod1a > 0.0){
-                    Color = mix(gGridColorThick, gGridColorThin, LOD_fade);
-                    Color.a *= Lod1a;
-                } else {
-                    Color = gGridColorThin;
-                    Color.a *= (Lod0a * (1.0 - LOD_fade));
-             }
-        }
-    
+        Color = gGridColorThin * (Lod0a * (1.0 - LOD_fade));
+    }
+
+    Color.a = 1.0;
     FragColor = Color;
 }
