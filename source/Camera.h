@@ -40,7 +40,7 @@ class Camera {
 
     GLfloat yaw = 0.0f;
     GLfloat pitch = 0.5f;
-    GLfloat movementSpeed = 5.0f;
+    GLfloat movementSpeed = 50.0f;
 
     glm::mat4 calcView() const;
 

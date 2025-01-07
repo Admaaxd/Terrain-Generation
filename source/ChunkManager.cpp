@@ -105,6 +105,8 @@ void ChunkManager::renderChunks(const glm::mat4& gVP, const glm::vec3& cameraPos
     int16_t camChunkX = (int16_t)floor(cameraPosition.x / (CHUNK_SIZE * CELL_SIZE));
     int16_t camChunkZ = (int16_t)floor(cameraPosition.z / (CHUNK_SIZE * CELL_SIZE));
 
+    unloadFarChunks(cameraPosition, camChunkX, camChunkZ, renderDistance);
+
     for (int16_t cz = camChunkZ - renderDistance; cz <= camChunkZ + renderDistance; ++cz) {
         for (int16_t cx = camChunkX - renderDistance; cx <= camChunkX + renderDistance; ++cx) {
             long long key = chunkKey(cx, cz);
