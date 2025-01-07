@@ -1,3 +1,5 @@
+![terrain](https://github.com/user-attachments/assets/0a249c7e-d3a1-4b75-91ef-ebbb70c0ec0f)
+
 ## How to build it using CMake
 
 1. **Clone the repository**:
