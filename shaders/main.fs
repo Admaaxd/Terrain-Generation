@@ -3,10 +3,14 @@ out vec4 FragColor;
 
 in vec3 WorldPos;
 
+in float visibility;
+
 uniform float gGridMinPixelsBetweenCells = 2.0;
 uniform float gGridCellSize = 0.025;
 uniform vec4 gGridColorThin = vec4(0.5, 0.5, 0.5, 1.0);
 uniform vec4 gGridColorThick = vec4(0.0, 0.0, 0.0, 1.0);
+
+uniform vec3 skycolor;
 
 void main()
 {
@@ -53,5 +57,6 @@ void main()
     }
 
     Color.a = 1.0;
+    Color = mix(vec4(skycolor, 1.0), Color, visibility);
     FragColor = Color;
 }

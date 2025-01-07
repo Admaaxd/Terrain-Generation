@@ -84,6 +84,8 @@ void main::processRendering(GLFWwindow* window, shader& mainShader)
 	
 	mainShader.setMat4("gVP", gVP);
 
+	mainShader.setVec3("skycolor", glm::vec3(1.0f, 1.0f, 1.0f));
+
 	glm::vec3 cameraWorldPos = camera.getPosition();
 
 	const float CELL_SIZE = 1.0f;
